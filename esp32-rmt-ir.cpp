@@ -204,7 +204,7 @@ bool irrx_done(rmt_channel_handle_t channel, const rmt_rx_done_event_data_t *eda
 
 
 
-void sendIR(irproto brand, uint32_t code, uint8_t bits, uint8_t pulse, uint8_t repeat) {
+void sendIR(irproto brand, uint32_t code, uint8_t bits, uint8_t burst, uint8_t repeat) {
 
 	irTX = 1;
 	for(;;){
@@ -259,7 +259,7 @@ void sendIR(irproto brand, uint32_t code, uint8_t bits, uint8_t pulse, uint8_t r
 		//}
 	};
 	for(uint8_t j = 0; j < repeat; j++){
-		for(uint8_t i = 0; i < pulse; i++){
+		for(uint8_t i = 0; i < burst; i++){
 			rmt_transmit(tx_channel, encoder_handle, &codetx, sizeof(codetx), &tx_config);
 			rmt_tx_wait_all_done(tx_channel, portMAX_DELAY);
 			vTaskDelay( rptgap / portTICK_PERIOD_MS );
