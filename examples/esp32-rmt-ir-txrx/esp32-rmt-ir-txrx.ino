@@ -28,8 +28,8 @@ void setup() {
 }
 
 void loop() {
-	sendIR(NEC, 0xC1AAFC03, 32, 1, 1);
+	sendIR(NEC, 0xC1AAFC03, 32, 1, 1); //protocol, code, bits, bursts, repeats
 	delay(1000);
-	sendIR(SONY, 0x3e108, 20, 1, 1);
+	sendIR(SONY, 0x3e108, 20, 1, 1); //protocol, code, bits, bursts, repeats
 	delay(1000);
 }
