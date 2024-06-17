@@ -17,7 +17,6 @@ extern uint8_t irTxPin;
 
 enum irproto { UNK, NEC, SONY, SAM, RC5, PROTO_COUNT };
 
-extern void irReceived(irproto brand, uint32_t code, size_t len, rmt_symbol_word_t *item);
 
 typedef struct {
 	rmt_encoder_t base;
@@ -47,6 +46,9 @@ typedef struct {
 
 extern const ir_protocol_t proto[PROTO_COUNT];
 
+extern void irReceived(irproto brand, uint32_t code, size_t len, rmt_symbol_word_t *item);
+void sendIR(irproto brand, uint32_t code, uint8_t bits = 32, uint8_t burst = 1, uint8_t repeat = 1);
+
 IRAM_ATTR bool irrx_done(rmt_channel_handle_t channel, const rmt_rx_done_event_data_t *edata, void *udata);
 
 void recvIR(void* param);
@@ -56,7 +58,6 @@ uint32_t sony_check(rmt_symbol_word_t *item, size_t &len);
 uint32_t rc5_check(rmt_symbol_word_t *item, size_t &len);
 bool rc5_bit(uint32_t d, uint32_t v);
 bool checkbit(rmt_symbol_word_t &item, uint16_t high, uint16_t low);
-void sendIR(irproto brand, uint32_t code, uint8_t bits, uint8_t pulse, uint8_t repeat);
 void fill_item(rmt_symbol_word_t &item, uint16_t high, uint16_t low, bool bit);
 
 static esp_err_t rmt_ir_encoder_reset(rmt_encoder_t *encoder);
