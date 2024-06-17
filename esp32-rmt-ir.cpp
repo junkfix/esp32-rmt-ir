@@ -83,6 +83,77 @@ void recvIR(void* param){
 }
 
 
+
+void sendIR(irproto brand, uint32_t code, uint8_t bits, uint8_t burst, uint8_t repeat) {
+
+	irTX = 1;
+	for(;;){
+		if(irRX == 0){break;}
+		vTaskDelay( 2 / portTICK_PERIOD_MS );
+	}
+
+	sendir_t codetx = {brand, code, bits};
+
+	rmt_channel_handle_t tx_channel = NULL;
+	
+	rmt_tx_channel_config_t txconf = {
+		.gpio_num = static_cast<gpio_num_t>(irTxPin),
+		.clk_src = RMT_CLK_SRC_DEFAULT,
+		.resolution_hz = 1000000, // 1MHz resolution, 1 tick = 1us
+		.mem_block_symbols = 64,
+		.trans_queue_depth = 4,
+	};
+	
+	if(rmt_new_tx_channel(&txconf, &tx_channel) != ESP_OK) {
+		return;
+	}
+	float duty = 0.50;
+	uint8_t rptgap = 100; if(brand == SONY){rptgap = 24; duty = 0.40;}
+	
+	rmt_carrier_config_t carrier_cfg = {
+		.frequency_hz = proto[brand].frequency,
+		.duty_cycle = duty,
+		//.flags = {
+		//	.polarity_active_low = 0
+		//}
+	};
+	
+	rmt_apply_carrier(tx_channel, &carrier_cfg);
+
+	rmt_ir_encoder_t *ir_encoder = (rmt_ir_encoder_t *)calloc(1, sizeof(rmt_ir_encoder_t));
+	ir_encoder->base.encode = rmt_encode_ir;
+	ir_encoder->base.del = rmt_del_ir_encoder;
+	ir_encoder->base.reset = rmt_ir_encoder_reset;
+
+	rmt_copy_encoder_config_t copy_encoder_config = {};
+	rmt_new_copy_encoder(&copy_encoder_config, &ir_encoder->copy_encoder);
+
+	rmt_encoder_handle_t encoder_handle = &ir_encoder->base;
+
+	rmt_enable(tx_channel);
+
+	rmt_transmit_config_t tx_config = {
+		.loop_count = 0,
+		//.flags = {
+		//	.eot_level = 0
+		//}
+	};
+	for(uint8_t j = 0; j < repeat; j++){
+		for(uint8_t i = 0; i < burst; i++){
+			rmt_transmit(tx_channel, encoder_handle, &codetx, sizeof(codetx), &tx_config);
+			rmt_tx_wait_all_done(tx_channel, portMAX_DELAY);
+			vTaskDelay( rptgap / portTICK_PERIOD_MS );
+		}
+		vTaskDelay( 100 / portTICK_PERIOD_MS );
+	}
+	
+	rmt_disable(tx_channel);
+	rmt_del_channel(tx_channel);
+	rmt_del_encoder(encoder_handle);
+	irTX = 0;
+}
+
+
 uint32_t nec_check(rmt_symbol_word_t *item, size_t &len){
 	const uint8_t  totalData = 34;
 	if(len < totalData ){
@@ -201,79 +272,6 @@ bool irrx_done(rmt_channel_handle_t channel, const rmt_rx_done_event_data_t *eda
 	return h == pdTRUE;
 }
 
-
-
-
-void sendIR(irproto brand, uint32_t code, uint8_t bits, uint8_t burst, uint8_t repeat) {
-
-	irTX = 1;
-	for(;;){
-		if(irRX == 0){break;}
-		vTaskDelay( 2 / portTICK_PERIOD_MS );
-	}
-
-	sendir_t codetx = {brand, code, bits};
-
-	rmt_channel_handle_t tx_channel = NULL;
-	
-	rmt_tx_channel_config_t txconf = {
-		.gpio_num = static_cast<gpio_num_t>(irTxPin),
-		.clk_src = RMT_CLK_SRC_DEFAULT,
-		.resolution_hz = 1000000, // 1MHz resolution, 1 tick = 1us
-		.mem_block_symbols = 64,
-		.trans_queue_depth = 4,
-	};
-	
-	if(rmt_new_tx_channel(&txconf, &tx_channel) != ESP_OK) {
-		return;
-	}
-	float duty = 0.50;
-	uint8_t rptgap = 100; if(brand == SONY){rptgap = 24; duty = 0.40;}
-	
-	rmt_carrier_config_t carrier_cfg = {
-		.frequency_hz = proto[brand].frequency,
-		.duty_cycle = duty,
-		//.flags = {
-		//	.polarity_active_low = 0
-		//}
-	};
-	
-	rmt_apply_carrier(tx_channel, &carrier_cfg);
-
-	rmt_ir_encoder_t *ir_encoder = (rmt_ir_encoder_t *)calloc(1, sizeof(rmt_ir_encoder_t));
-	ir_encoder->base.encode = rmt_encode_ir;
-	ir_encoder->base.del = rmt_del_ir_encoder;
-	ir_encoder->base.reset = rmt_ir_encoder_reset;
-
-	rmt_copy_encoder_config_t copy_encoder_config = {};
-	rmt_new_copy_encoder(&copy_encoder_config, &ir_encoder->copy_encoder);
-
-	rmt_encoder_handle_t encoder_handle = &ir_encoder->base;
-
-	rmt_enable(tx_channel);
-
-	rmt_transmit_config_t tx_config = {
-		.loop_count = 0,
-		//.flags = {
-		//	.eot_level = 0
-		//}
-	};
-	for(uint8_t j = 0; j < repeat; j++){
-		for(uint8_t i = 0; i < burst; i++){
-			rmt_transmit(tx_channel, encoder_handle, &codetx, sizeof(codetx), &tx_config);
-			rmt_tx_wait_all_done(tx_channel, portMAX_DELAY);
-			vTaskDelay( rptgap / portTICK_PERIOD_MS );
-		}
-		vTaskDelay( 100 / portTICK_PERIOD_MS );
-	}
-
-
-
-	rmt_disable(tx_channel);
-	rmt_del_channel(tx_channel);
-	rmt_del_encoder(encoder_handle);
-	irTX = 0;
-}
 
 
 size_t rmt_encode_ir(rmt_encoder_t *encoder, rmt_channel_handle_t channel, const void *primary_data, size_t data_size, rmt_encode_state_t *ret_state) {
